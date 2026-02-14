@@ -39,13 +39,17 @@ def publish(client, topic, datasource, delay):
 
         client.publish(f"{topic}/gps/longitude", str(data.gps.longitude))
         client.publish(f"{topic}/gps/latitude", str(data.gps.latitude))
+        
+        client.publish(f"{topic}/parking/empty_count", str(data.parking.empty_count))
+        client.publish(f"{topic}/parking/gps/longitude", str(data.parking.gps.longitude))
+        client.publish(f"{topic}/parking/gps/latitude", str(data.parking.gps.latitude))
 
         client.publish(f"{topic}/time", data.time.isoformat())
 
 
 def run():
     client = connect_mqtt(config.MQTT_BROKER_HOST, config.MQTT_BROKER_PORT)
-    datasource = FileDatasource("data/accelerometer.csv", "data/gps.csv")
+    datasource = FileDatasource("data/accelerometer.csv", "data/gps.csv", "data/parking.csv")
     publish(client, config.MQTT_TOPIC, datasource, config.DELAY)
 
 
