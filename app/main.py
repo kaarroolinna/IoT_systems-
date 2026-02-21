@@ -55,7 +55,7 @@ async def create_processed_agent_data(data: List[ProcessedAgentData]):
             ).returning(processed_agent_data)
             res = conn.execute(stmt)
             row = res.fetchone()
-            inserted_rows.append(dict(row))
+            inserted_rows.append(dict(row._mapping))
         trans.commit()
         await send_data_to_subscribers({"type": "new_batch", "count": len(inserted_rows), "items": inserted_rows})
         return inserted_rows
@@ -73,7 +73,7 @@ def read_processed_agent_data(processed_agent_data_id: int):
         res = conn.execute(stmt).fetchone()
         if not res:
             raise HTTPException(status_code=404, detail="Not found")
-        return dict(res)
+        return dict(res._mapping)
     finally:
         conn.close()
 
@@ -83,7 +83,7 @@ def list_processed_agent_data():
     try:
         stmt = select(processed_agent_data).order_by(processed_agent_data.c.id)
         res = conn.execute(stmt).fetchall()
-        return [dict(r) for r in res]
+        return [dict(r._mapping) for r in res]
     finally:
         conn.close()
 
@@ -112,7 +112,7 @@ def update_processed_agent_data(processed_agent_data_id: int, data: ProcessedAge
             trans.rollback()
             raise HTTPException(status_code=404, detail="Not found")
         trans.commit()
-        return dict(res)
+        return dict(res._mapping)
     except SQLAlchemyError as e:
         trans.rollback()
         raise HTTPException(status_code=500, detail=str(e))
@@ -130,7 +130,7 @@ def delete_processed_agent_data(processed_agent_data_id: int):
             trans.rollback()
             raise HTTPException(status_code=404, detail="Not found")
         trans.commit()
-        return dict(res)
+        return dict(res._mapping)
     except SQLAlchemyError as e:
         trans.rollback()
         raise HTTPException(status_code=500, detail=str(e))
