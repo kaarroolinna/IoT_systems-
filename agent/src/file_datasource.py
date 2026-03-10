@@ -79,7 +79,7 @@ class FileDatasource:
             accelerometer=accelerometer,
             gps=gps,
             parking=parking,
-            time=datetime.utcnow(),
+            timestamp=datetime.utcnow(),
         )
 
     def _read_last_valid_row(self, kind: str, min_cols: int):

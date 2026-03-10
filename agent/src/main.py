@@ -44,7 +44,7 @@ def publish(client, topic, datasource, delay):
         client.publish(f"{topic}/parking/gps/longitude", str(data.parking.gps.longitude))
         client.publish(f"{topic}/parking/gps/latitude", str(data.parking.gps.latitude))
 
-        client.publish(f"{topic}/time", data.time.isoformat())
+        client.publish(f"{topic}/timestamp", data.timestamp.isoformat())
 
 
 def run():
