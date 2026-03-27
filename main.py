@@ -4,6 +4,7 @@ from kivy_garden.mapview import MapMarker, MapView
 from kivy.clock import Clock
 from scipy.signal import find_peaks
 from lineMapLayer import LineMapLayer
+from store_client import StoreClient
 
 
 ACCEL_WINDOW = 100  # кількість показників для аналізу
@@ -53,6 +54,7 @@ class MapViewApp(App):
         self.accel_buffer = []
         self.car_marker = None
         self.line_layer = LineMapLayer()
+        self.store = StoreClient()
 
     def on_start(self):
         start = self.gps_points[0]
@@ -73,20 +75,36 @@ class MapViewApp(App):
         Clock.schedule_interval(self.update, UPDATE_INTERVAL)
 
     def update(self, *args):
-        if self.index >= len(self.gps_points):
-            return
+        data = self.store.get_data()
 
-        point = self.gps_points[self.index]
-        z_val = self.accel_z[self.index]
-        self.index += 1
+        if data:
+            point = (data["lat"], data["lon"])
+            road_state = data["road_state"]
+        else:
+            if self.index >= len(self.gps_points):
+                return
+
+            point = self.gps_points[self.index]
+            z_val = self.accel_z[self.index]
+            self.index += 1
+
+            self.update_car_marker(point)
+            self._safe_add_point(point)
+
+            self.accel_buffer.append(z_val)
+            if len(self.accel_buffer) >= ACCEL_WINDOW:
+                self.check_road_quality()
+                self.accel_buffer = []
+
+            return
 
         self.update_car_marker(point)
         self._safe_add_point(point)
 
-        self.accel_buffer.append(z_val)
-        if len(self.accel_buffer) >= ACCEL_WINDOW:
-            self.check_road_quality()
-            self.accel_buffer = []
+        if road_state == "pothole":
+            self.set_pothole_marker(point)
+        elif road_state == "bump":
+            self.set_bump_marker(point)
 
     def _safe_add_point(self, point):
         """Додає точку до лінії тільки якщо шар вже готовий."""
