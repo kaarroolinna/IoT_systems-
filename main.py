@@ -5,53 +5,27 @@ from kivy.clock import Clock
 from scipy.signal import find_peaks
 from lineMapLayer import LineMapLayer
 from store_client import StoreClient
+from file_datasource import FileDatasource
 
 
-ACCEL_WINDOW = 100  # кількість показників для аналізу
-UPDATE_INTERVAL = 0.1  # секунди між оновленнями (100 мс)
+ACCEL_WINDOW = 100
+UPDATE_INTERVAL = 0.1
 
-# cтартова точка маршруту (Київ)
 BASE_LAT = 50.4501
 BASE_LON = 30.5234
 
-# крок між точками маршруту (~1 м на крок при 100 мс інтервалі = ~10 м/с)
-LAT_STEP = 0.000009
-LON_STEP = 0.000009
-
-
-def load_csv(path):
-    accel_x = []
-    accel_y = []
-    accel_z = []
-
-    with open(path, newline="", encoding="utf-8") as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            accel_x.append(float(row["x"]))
-            accel_y.append(float(row["y"]))
-            accel_z.append(float(row["z"]))
-
-    gps_points = []
-    with open("gps.csv", newline="", encoding="utf-8") as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            lat = float(row["longitude"])
-            lon = float(row["latitude"])
-            gps_points.append((lat, lon))
-
-    n = len(accel_z)
-
-    gps_points = [gps_points[i % len(gps_points)] for i in range(n)]
-
-    print(f"[CSV] Завантажено {n} рядків акселерометра")
-    print(f"[CSV] GPS: {len(gps_points)} точок, від {gps_points[0]} до {gps_points[-1]}")
-    return gps_points, accel_z
+# пороги визначення стану дороги
+POTHOLE_THRESHOLD = 15000
+BUMP_THRESHOLD = 18500
+PEAK_DISTANCE = 15
+PEAK_PROMINENCE = 800
 
 
 class MapViewApp(App):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.gps_points, self.accel_z = load_csv("data.csv")
+        self.datasource = FileDatasource("data.csv", "gps.csv")
+        self.gps_points, self.accel_z = self.datasource.read()
         self.index = 0
         self.accel_buffer = []
         self.car_marker = None
@@ -82,6 +56,14 @@ class MapViewApp(App):
         if data:
             point = (data["lat"], data["lon"])
             road_state = data["road_state"]
+
+            self.update_car_marker(point)
+            self._safe_add_point(point)
+
+            if road_state == "pothole":
+                self.set_pothole_marker(point)
+            elif road_state == "bump":
+                self.set_bump_marker(point)
         else:
             if self.index >= len(self.gps_points):
                 return
@@ -98,18 +80,7 @@ class MapViewApp(App):
                 self.check_road_quality()
                 self.accel_buffer = []
 
-            return
-
-        self.update_car_marker(point)
-        self._safe_add_point(point)
-
-        if road_state == "pothole":
-            self.set_pothole_marker(point)
-        elif road_state == "bump":
-            self.set_bump_marker(point)
-
     def _safe_add_point(self, point):
-        """Додає точку до лінії тільки якщо шар вже готовий."""
         if self.line_layer.parent is None or self.line_layer.ms <= 0:
             return
         try:
@@ -121,24 +92,23 @@ class MapViewApp(App):
         data = self.accel_buffer[:]
         base_idx = self.index - len(data)
 
-        # ями — локальні мінімуми осі Z
-        # (значення спокою ~16667, при ямі Z різко падає)
         inverted = [-v for v in data]
         potholes, _ = find_peaks(
             inverted,
-            height=-15000,  # було -16400
-            distance=15,
-            prominence=800,  # було 200
+            height=-POTHOLE_THRESHOLD,
+            distance=PEAK_DISTANCE,
+            prominence=PEAK_PROMINENCE,
         )
         for i in potholes:
             gps_i = base_idx + i
             if gps_i < len(self.gps_points):
                 self.set_pothole_marker(self.gps_points[gps_i])
 
-        # лежачі поліцейські — локальні максимуми осі Z
-        # (при наїзді Z різко зростає вище ~17000)
         bumps, _ = find_peaks(
-            data, height=18500, distance=15, prominence=800  # було 17200  # було 200
+            data,
+            height=BUMP_THRESHOLD,
+            distance=PEAK_DISTANCE,
+            prominence=PEAK_PROMINENCE,
         )
         for i in bumps:
             gps_i = base_idx + i
@@ -148,6 +118,7 @@ class MapViewApp(App):
     def update_car_marker(self, point):
         self.car_marker.lat = point[0]
         self.car_marker.lon = point[1]
+        self.mapview.center_on(point[0], point[1])
 
     def set_pothole_marker(self, point):
         marker = MapMarker(lat=point[0], lon=point[1])

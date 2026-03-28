@@ -1,8 +1,13 @@
 import json
 import paho.mqtt.client as mqtt
 
+MQTT_BROKER = "localhost"
+MQTT_PORT = 1883
+MQTT_TOPIC = "processed_data_topic"
+
+
 class StoreClient:
-    def __init__(self, broker="localhost", port=1883, topic="processed_data_topic"):
+    def __init__(self, broker=MQTT_BROKER, port=MQTT_PORT, topic=MQTT_TOPIC):
         self.broker = broker
         self.port = port
         self.topic = topic
@@ -21,8 +26,10 @@ class StoreClient:
 
     def on_connect(self, client, userdata, flags, rc):
         if rc == 0:
-            print("[StoreClient] Connected to MQTT")
+            print(f"[StoreClient] Connected to MQTT ({self.broker}:{self.port})")
             self.client.subscribe(self.topic)
+        else:
+            print(f"[StoreClient] Failed to connect, rc={rc}")
 
     def on_message(self, client, userdata, msg):
         try:
@@ -39,7 +46,9 @@ class StoreClient:
             }
 
         except Exception as e:
-            print(f"[StoreClient] Error: {e}")
+            print(f"[StoreClient] Error parsing message: {e}")
 
     def get_data(self):
-        return self.latest_data
+        data = self.latest_data
+        self.latest_data = None  # скидаємо після читання
+        return data
