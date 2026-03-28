@@ -20,11 +20,6 @@ LON_STEP = 0.000009
 
 
 def load_csv(path):
-    """
-    Зчитує data.csv.
-    Колонки у файлі: lat (= x акселерометра), lon (= y акселерометра), z.
-    GPS-координати генеруються автоматично, бо у файлі їх немає.
-    """
     accel_x = []
     accel_y = []
     accel_z = []
@@ -36,13 +31,20 @@ def load_csv(path):
             accel_y.append(float(row["y"]))
             accel_z.append(float(row["z"]))
 
+    gps_points = []
+    with open("gps.csv", newline="", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            lat = float(row["longitude"])
+            lon = float(row["latitude"])
+            gps_points.append((lat, lon))
+
     n = len(accel_z)
 
-    # генеруємо GPS-трек: рухаємось по діагоналі
-    gps_points = [(BASE_LAT + i * LAT_STEP, BASE_LON + i * LON_STEP) for i in range(n)]
+    gps_points = [gps_points[i % len(gps_points)] for i in range(n)]
 
     print(f"[CSV] Завантажено {n} рядків акселерометра")
-    print(f"[CSV] GPS згенерований автоматично від {gps_points[0]} до {gps_points[-1]}")
+    print(f"[CSV] GPS: {len(gps_points)} точок, від {gps_points[0]} до {gps_points[-1]}")
     return gps_points, accel_z
 
 
