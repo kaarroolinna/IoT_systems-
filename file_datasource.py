@@ -18,7 +18,6 @@ class FileDatasource:
         with open(self.gps_path, newline="", encoding="utf-8") as f:
             reader = csv.DictReader(f)
             for row in reader:
-                # колонки переплутані в файлі
                 lat = float(row["longitude"])
                 lon = float(row["latitude"])
                 gps_points.append((lat, lon))
